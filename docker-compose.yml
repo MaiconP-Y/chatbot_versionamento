@@ -1,0 +1,194 @@
+services:
+  db:
+    image: postgres:17
+    container_name: db-1
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DATABASE_NAME}
+      POSTGRES_USER: ${DATABASE_USERNAME}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USERNAME} -d ${DATABASE_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    logging: &default-logging
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    command: redis-server --port 6379 --appendonly yes
+    restart: unless-stopped
+    volumes:
+      - redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 5
+    logging: *default-logging
+
+  waha:
+    container_name: waha
+    image: devlikeapro/waha:latest
+    restart: unless-stopped
+    environment:
+      - WAHA_DASHBOARD_ENABLED=true
+      - WAHA_API_KEY=${WAHA_API_KEY}
+      - WAHA_SESSION_CONFIG_IGNORE_STATUS=true
+      - WAHA_SESSION_CONFIG_IGNORE_GROUPS=true
+      - WAHA_SESSION_CONFIG_IGNORE_CHANNELS=true
+      - WAHA_SESSION_CONFIG_IGNORE_BROADCAST=true
+      - WHATSAPP_HOOK_HMAC_KEY=${WEBHOOK_HMAC_SECRET}
+      - WHATSAPP_HOOK_URL=${WHATSAPP_HOOK_URL}
+    volumes:
+      - waha_data:/app/.sessions
+    env_file:
+      - .env
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  django-web:
+    build: .
+    container_name: django-docker
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      waha:
+        condition: service_started
+    environment:
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
+      DEBUG: ${DEBUG}
+      DJANGO_LOGLEVEL: ${DJANGO_LOGLEVEL}
+      DJANGO_ALLOWED_HOSTS: ${DJANGO_ALLOWED_HOSTS}
+      DATABASE_ENGINE: ${DATABASE_ENGINE}
+      DATABASE_NAME: ${DATABASE_NAME}
+      DATABASE_USERNAME: ${DATABASE_USERNAME}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
+      DATABASE_HOST: ${DATABASE_HOST}
+      DATABASE_PORT: ${DATABASE_PORT}
+      WEBHOOK_HMAC_SECRET: ${WEBHOOK_HMAC_SECRET}
+      ID_AGENDA: ${ID_AGENDA}
+      PYTHONPATH: /app
+    env_file:
+      - .env
+    volumes:
+      - staticfiles_volume:/app/staticfiles_dist
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import socket; s = socket.socket(); s.connect((\"localhost\", 8000))'"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    logging: *default-logging
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+
+  go-gateway:
+    build:
+      context: ./go_gateway
+      dockerfile: Dockerfile.go 
+    container_name: go_webhook_gateway
+    restart: unless-stopped
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      REDIS_HOST: redis
+      WEBHOOK_HMAC_SECRET: ${WEBHOOK_HMAC_SECRET}
+    env_file:
+      - .env
+    logging: *default-logging
+
+  worker:
+    build: .
+    container_name: whatsapp-worker
+    restart: unless-stopped
+    depends_on:
+      django-web:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      waha:
+        condition: service_started
+      go-gateway:
+        condition: service_started
+    environment:
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT}
+      REDIS_DB: ${REDIS_DB}
+      PYTHONPATH: /app
+    env_file:
+      - .env
+    command: python workers/whatsapp_worker.py
+    logging: *default-logging
+  
+  celery-worker:
+    build: .
+    container_name: celery-worker
+    command: celery -A chatbot worker -l info --concurrency=1
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      django-web:
+        condition: service_healthy
+    logging: *default-logging
+
+  celery-beat:
+    build: .
+    container_name: celery-beat
+    command: celery -A chatbot beat -l info
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      django-web:
+        condition: service_healthy
+    logging: *default-logging
+
+  nginx:
+    image: nginx:stable-alpine
+    container_name: nginx-reverse-proxy
+    restart: unless-stopped
+    depends_on:
+      django-web:
+        condition: service_healthy
+      go-gateway:
+        condition: service_started
+    ports:
+      - "127.0.0.1:8080:80"
+    volumes:
+      - staticfiles_volume:/app/staticfiles_dist:ro
+      - ./nginx.conf:/etc/nginx/nginx.conf
+    logging: *default-logging
+
+volumes:
+  postgres_data:
+  redis:
+  waha_data:
+  staticfiles_volume:

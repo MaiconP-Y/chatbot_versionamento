@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de Controle</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>☯</text></svg>">
+    <style>
+        /* === VARIÁVEIS E TEMA === */
+        body {
+            --background-page: #f4f4f9;
+            --background-card: #ffffff;
+            --header-bg: #ffffff;
+            --text-color: #333;
+            --text-secondary: #666;
+            --border-color: #ddd;
+            --danger-color: #dc3545; 
+            --success-color: #28a745;
+            --warning-color: #ffc107;
+            --table-header-bg: #e2e6ea;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            background-color: var(--background-page);
+            color: var(--text-color);
+            transition: background-color 0.3s, color 0.3s;
+        }
+
+        body.dark-mode {
+            --background-page: #1a1a2e;
+            --background-card: #2c2c43;
+            --header-bg: #2c2c43;
+            --text-color: #f0f0f0;
+            --text-secondary: #aaaaaa;
+            --border-color: #3e3e5a;
+            --table-header-bg: #3e3e5a;
+        }
+
+        header {
+            background-color: var(--header-bg);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            padding: 15px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        header h1 { color: var(--text-color); margin: 0; font-size: 1.6em; }
+        
+        .header-controls { display: flex; align-items: center; }
+        .header-info {
+            font-size: 0.85em;
+            color: var(--text-secondary);
+            margin-right: 15px; 
+        }
+
+        .container {
+            max-width: 1300px;
+            margin: 20px auto;
+            background: var(--background-card);
+            padding: 25px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+        }
+        
+        .tab-navigation { display: flex; border-bottom: 2px solid var(--border-color); margin-bottom: 20px; }
+        .tab-btn {
+            background: none; border: none; padding: 10px 20px; cursor: pointer;
+            font-size: 1em; color: var(--text-secondary); border-bottom: 3px solid transparent;
+            transition: 0.3s; font-weight: bold;
+        }
+        .tab-btn.active { color: var(--danger-color); border-bottom: 3px solid var(--danger-color); }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .section { margin: 0; padding: 0; }
+        .section h2 { 
+            border-bottom: 2px solid var(--danger-color); 
+            padding-bottom: 10px; 
+            margin: 0 0 15px 0;
+            color: var(--text-color);
+        }
+
+        .row-layout { 
+            display: flex; 
+            gap: 20px; 
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .section.col-half:first-child { flex: 0.9; }
+        .section.col-half:last-child { flex: 1; }
+
+        table { 
+            width: 100%; 
+            border-collapse: collapse; 
+            table-layout: fixed;
+            margin-top: 0;
+            border: 1px solid var(--border-color);
+        }
+
+        th, td { 
+            padding: 10px; 
+            text-align: left; 
+            font-size: 0.82em; 
+            border: 1px solid var(--border-color);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap; 
+        }
+
+        th { background-color: var(--table-header-bg); }
+
+        .table-container {
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            overflow-x: auto;
+            background: var(--background-card);
+        }
+
+        .btn-action {
+            background-color: var(--success-color);
+            color: white; border: none; border-radius: 4px; padding: 8px 16px;
+            cursor: pointer; font-weight: bold; transition: opacity 0.2s;
+            display: flex; align-items: center; gap: 8px;
+            text-decoration: none;
+        }
+        .btn-action:hover { opacity: 0.8; }
+
+        .btn-small { padding: 4px 8px; font-size: 0.75em; }
+        .btn-warning { background-color: var(--warning-color); color: #000; }
+
+        #theme-toggle {
+            background: transparent; color: var(--text-color); border: 1px solid var(--border-color);
+            padding: 8px 12px; border-radius: 50px; cursor: pointer;
+        }
+        #panic-button {
+            background: var(--danger-color);
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 50px;
+            cursor: pointer;
+            margin-right: 10px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+
+        #panic-button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 0 10px rgba(220, 53, 69, 0.5);
+        }
+
+        .modal-overlay {
+            display: none; 
+            position: fixed; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%;
+            background: rgba(0,0,0,0.95); /* Escurece tudo para foco total */
+            z-index: 9999; 
+            align-items: center; 
+            justify-content: center;
+            cursor: wait; /* Muda o mouse para indicar que o sistema está trabalhando */
+        }
+        .modal-content {
+            background: var(--background-card); padding: 30px; border-radius: 12px;
+            text-align: center; max-width: 400px; width: 90%; color: var(--text-color);
+        }
+
+        @media (max-width: 992px) { .row-layout { flex-direction: column; } .col-half { width: 100%; } }
+    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+</head>
+<body>
+
+<header>
+    <h1> Painel de Controle </h1>
+    <div class="header-controls">
+        <div class="header-info">Acesso: Superusuário</div>
+        <button onclick="emergencyFlush()" id="panic-button" title="Limpeza de Emergência (Reset Redis)">
+            <i class="fas fa-bolt"></i>
+        </button>
+        <button id="theme-toggle" title="Alternar tema"><i class="fas fa-sun"></i></button>
+    </div>
+</header>
+
+<div class="container">
+    
+    {% if status_waha != 'WORKING' %}
+    <div id="banner-congelado" style="background: var(--danger-color); color: white; padding: 15px 25px; border-radius: 8px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;">
+        <div>
+            <h3 style="margin: 0; font-size: 1.1em;"><i class="fas fa-exclamation-triangle"></i> WHATSAPP DESCONECTADO</h3>
+            <p style="margin: 5px 0 0 0; font-size: 0.9em; opacity: 0.9;">Aponte o QR Code para ativar o sistema de agendamento.</p>
+        </div>
+        <button class="btn-action" style="background: white; color: var(--danger-color); border: none;" onclick="iniciarConexaoHibrida()">
+            <i class="fas fa-qrcode"></i> CONECTAR AGORA
+        </button>
+    </div>
+    {% endif %}
+
+    <nav class="tab-navigation">
+        <button class="tab-btn active" onclick="openTab(event, 'aba-monitoramento')"><i class="fas fa-chart-line"></i> Monitoramento</button>
+        <button class="tab-btn" onclick="openTab(event, 'aba-cadastros')"><i class="fas fa-users"></i> Cadastros & Atividade</button>
+    </nav>
+
+    <div id="aba-monitoramento" class="tab-content active">
+        <div class="row-layout">
+            <div class="section col-half">
+                <h2><i class="fas fa-user-shield"></i> Solicitações de atendimento </h2>
+                <div id="blacklist-list">
+                    {% if blacklisted_ids %}
+                    <form id="form-remover-handoff">
+                        <div class="table-container">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th style="width: 40px; text-align: center;"><input type="checkbox" onclick="toggleSelectAll('handoff_selecionados', this)"></th>
+                                        <th>ID do Chat (WhatsApp)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for chat_id in blacklisted_ids %}
+                                    <tr>
+                                        <td style="text-align: center;">
+                                            <input type="checkbox" name="handoff_selecionados" value="{{ chat_id }}">
+                                        </td>
+                                        <td>{{ chat_id|slice:":-5" }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div style="margin-top: 15px; display: flex; justify-content: flex-end;">
+                            <button type="button" class="btn-action" onclick="liberarHandoffBulk()">Liberar para IA</button>
+                        </div>
+                    </form>
+                    {% else %}
+                    <p style="padding: 15px; background: rgba(40,167,69,0.1); color: var(--success-color); border: 1px solid var(--success-color); border-radius: 4px;">Nenhum chat pendente.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="section col-half">
+                <h2><i class="fas fa-calendar-check"></i> Agenda de Hoje (Google)</h2>
+                
+                {% if not google_ready %}
+                <div style="text-align: center; padding: 40px 20px; border: 2px dashed var(--border-color); border-radius: 8px; background: rgba(0,0,0,0.02);">
+                    <i class="fab fa-google" style="font-size: 3em; color: var(--border-color); margin-bottom: 15px;"></i>
+                    <h3 style="color: var(--text-secondary);">Integração Pendente</h3>
+                    <p style="color: var(--text-secondary); font-size: 0.9em; margin-bottom: 20px;">Conecte sua conta para visualizar os agendamentos e liberar o bot.</p>
+                </div>
+                {% else %}
+                <div class="table-container" style="max-height: 500px; overflow-y: auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width: 60px;">Hora</th>
+                                <th>Paciente</th>
+                                <th style="width: 110px;">WhatsApp</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for ev in agenda_google %}
+                            <tr>
+                                <td><strong>{{ ev.horario }}</strong></td>
+                                <td>{{ ev.nome }}</td>
+                                <td>{{ ev.whatsapp }}</td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="3" style="text-align: center; padding: 20px;">Nenhum evento para hoje.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div style="margin-top: 10px; text-align: right;">
+                    <small style="color: var(--success-color); font-weight: bold;">
+                        <i class="fas fa-check-circle"></i> Conexão Ativa
+                    </small>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div id="aba-cadastros" class="tab-content">
+        <div class="row-layout">
+            <div class="section col-half">
+                <h2><i class="fas fa-address-book"></i> Usuários</h2>
+                <form id="form-remover-usuarios">
+                    <div class="table-container" style="max-height: 500px; overflow-y: auto;">
+                        {% if usuarios %}
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="width: 30px; text-align: center;"><input type="checkbox" onclick="toggleSelectAll('usuarios_selecionados', this)"></th>
+                                    <th>Nome / WhatsApp</th>
+                                    <th style="width: 80px;">Agenda 1</th>
+                                    <th style="width: 80px;">Agenda 2</th>
+                                    <th style="width: 90px; text-align: center;">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for usuario in usuarios %}
+                                <tr>
+                                    <td style="text-align: center;"><input type="checkbox" name="usuarios_selecionados" value="{{ usuario.chat_id }}"></td>
+                                    <td><strong>{{ usuario.username }}</strong><br><small>{{ usuario.whatsapp_display }}</small></td>
+                                    <td>{% if usuario.appointment1_datetime %}{{ usuario.appointment1_datetime|date:"d/m H:i" }}{% else %}-{% endif %}</td>
+                                    <td>{% if usuario.appointment2_datetime %}{{ usuario.appointment2_datetime|date:"d/m H:i" }}{% else %}-{% endif %}</td>
+                                    <td style="text-align: center;">
+                                        <button type="button" class="btn-action btn-small btn-warning" onclick="assumirConversa('{{ usuario.chat_id }}')">
+                                            <i class="fas fa-hand-paper"></i> Assumir
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                        {% else %}
+                        <p style="padding: 20px;">Nenhum usuário no banco.</p>
+                        {% endif %}
+                    </div>
+                    <div style="margin-top: 15px; display: flex; justify-content: flex-end;">
+                        <button type="button" class="btn-action" style="background-color: var(--danger-color);" onclick="removerUsuariosBulk()">
+                            <i class="fas fa-trash-alt"></i> Excluir
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="section col-half">
+                <h2><i class="fas fa-chart-bar"></i> Atividade (Hoje)</h2>
+                <div class="table-container" style="max-height: 500px; overflow-y: auto;">
+                    {% if logs_diarios %}
+                    <table style="width: 100%; table-layout: fixed;"> <thead>
+                            <tr>
+                                <th style="width: 80px;">Hora</th>
+                                <th style="width: 45%;">WhatsApp</th> <th style="width: 45%;">Detalhes</th> </tr>
+                        </thead>
+                        <tbody>
+                            {% for log in logs_diarios %}
+                            <tr>
+                                <td>{{ log.time }}</td>
+                                <td>{{ log.phone }}</td>
+                                <td>{{ log.detalhes }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% else %}
+                    <p style="text-align: center; color: var(--text-secondary); padding: 20px;">Sem atividade recente.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="modal-qr" class="modal-overlay">
+    <div class="modal-content">
+        <h2 style="margin: 0 0 10px 0;"><i class="fas fa-qrcode"></i> Conectar WhatsApp</h2>
+        <p style="color: var(--text-secondary); font-size: 0.9em; margin-bottom: 20px;">Escaneie o QR Code abaixo com o seu WhatsApp para ativar a sessão.</p>
+        <div id="qr-container" style="background: white; padding: 15px; border-radius: 8px; min-height: 250px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--border-color);">
+            <img id="qr-img" src="" alt="QR Code" style="width: 100%; display: none;">
+            <div id="qr-loading" style="color: #333;">
+                <i class="fas fa-spinner fa-spin fa-2x"></i><br><br>Gerando QR Code...
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function openTab(event, tabId) {
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+        event.currentTarget.classList.add('active');
+    }
+
+    const themeToggle = document.getElementById('theme-toggle');
+    function applyTheme(theme) {
+        const isDark = theme === 'dark';
+        document.body.classList.toggle('dark-mode', isDark);
+        themeToggle.querySelector('i').className = isDark ? 'fas fa-moon' : 'fas fa-sun';
+        localStorage.setItem('theme', theme);
+    }
+    applyTheme(localStorage.getItem('theme') || 'light');
+    themeToggle.addEventListener('click', () => applyTheme(document.body.classList.contains('dark-mode') ? 'light' : 'dark'));
+
+    function toggleSelectAll(name, source) {
+        const checkboxes = document.getElementsByName(name);
+        for (let checkbox of checkboxes) { checkbox.checked = source.checked; }
+    }
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1)); break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    // --- AÇÕES DE CONTROLE (Agora via Namespace 'gui') ---
+
+    function liberarHandoffBulk() {
+        const ids = Array.from(document.querySelectorAll('input[name="handoff_selecionados"]:checked')).map(cb => cb.value);
+        if (ids.length === 0) { alert("Selecione ao menos um chat."); return; }
+        if (!confirm(`Deseja liberar ${ids.length} chat(s) para a IA?`)) return;
+
+        fetch("{% url 'gui:deactivate_handoff' %}", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+            body: JSON.stringify({ chat_ids: ids })
+        })
+        .then(response => response.json())
+        .then(data => { alert(data.message); window.location.reload(); })
+        .catch(err => alert("Erro ao processar solicitação."));
+    }
+
+    function removerUsuariosBulk() {
+        const ids = Array.from(document.querySelectorAll('input[name="usuarios_selecionados"]:checked')).map(cb => cb.value);
+        if (ids.length === 0) { alert("Selecione ao menos um usuário."); return; }
+        if (!confirm(`Deseja excluir permanentemente ${ids.length} usuário(s)?`)) return;
+
+        fetch("{% url 'gui:delete_users_api' %}", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+            body: JSON.stringify({ chat_ids: ids })
+        })
+        .then(response => response.json())
+        .then(data => { alert(data.message); window.location.reload(); })
+        .catch(err => alert("Erro ao excluir usuários."));
+    }
+
+    function assumirConversa(chatId) {
+        if (!confirm(`Pausar o bot para ${chatId} e assumir manualmente? O histórico da IA será limpo.`)) return;
+
+        fetch("{% url 'gui:activate_handoff' %}", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+            body: JSON.stringify({ chat_id: chatId })
+        })
+        .then(response => response.json())
+        .then(data => { alert(data.message); window.location.reload(); })
+        .catch(err => alert("Erro ao assumir conversa."));
+    }
+    
+    function emergencyFlush() {
+        if (confirm("⚠️ ATENÇÃO: Deseja apagar históricos e liberar todos os usuários?") && confirm("ESTÁ CERTO DISSO?")) {
+            fetch("{% url 'gui:emergency_flush' %}", { 
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') }
+            })
+            .then(response => response.json())
+            .then(data => { alert(data.message); window.location.reload(); })
+            .catch(err => alert("Erro crítico ao limpar sistema."));
+        }
+    }
+
+    // --- CONEXÃO WAHA E GOOGLE ---
+
+    function abrirModalQR() {
+        const modal = document.getElementById('modal-qr');
+        const img = document.getElementById('qr-img');
+        const loading = document.getElementById('qr-loading');
+        
+        modal.style.display = 'flex';
+        img.style.display = 'none';
+        loading.innerHTML = '<i class="fas fa-sync fa-spin"></i> Iniciando sessão...';
+        loading.style.display = 'block';
+
+        const qrUrl = "{% url 'gui:waha_qr_proxy' %}";
+        img.src = qrUrl + '?t=' + new Date().getTime();
+        
+        img.onload = function() {
+            loading.style.display = 'none';
+            img.style.display = 'block';
+        };
+
+        img.onerror = function() {
+            loading.innerHTML = 'O WAHA está processando... buscando QR Code novamente...';
+            setTimeout(() => {
+                img.src = qrUrl + '?t=' + new Date().getTime();
+            }, 3000);
+        };
+    }
+
+    let wahaMonitor = null;
+
+    function iniciarConexaoHibrida() {
+        // 1. Limpa qualquer monitoramento anterior
+        if (wahaMonitor) clearInterval(wahaMonitor);
+        
+        // 2. Abre o modal do QR Code
+        abrirModalQR(); 
+        
+        // 3. Inicia o loop de checagem usando sua view 'check_waha_status'
+        wahaMonitor = setInterval(() => {
+            fetch("{% url 'gui:waha_status' %}") // Certifique-se que o nome da URL está correto
+                .then(res => res.json())
+                .then(data => {
+                    // Quando o WAHA retornar 'WORKING' (vindo da sua view)
+                    if (data.status === 'WORKING') {
+                        clearInterval(wahaMonitor);
+                        wahaMonitor = null;
+
+                        const loadingText = document.getElementById('qr-loading');
+                        const qrImg = document.getElementById('qr-img');
+                        
+                        if(qrImg) qrImg.style.display = 'none';
+                        if(loadingText) {
+                            loadingText.style.display = 'block';
+                            loadingText.innerHTML = `
+                                <i class="fas fa-check-circle" style="color: var(--success-color); font-size: 3em;"></i>
+                                <br><br><b>WhatsApp Conectado!</b><br>Atualizando painel...
+                            `;
+                        }
+                        
+                        // 4. Recarrega para limpar o banner e atualizar os status na tela
+                        setTimeout(() => {
+                            window.location.reload(); 
+                        }, 2000);
+                    }
+                })
+                .catch(err => console.error("Monitorando conexão..."));
+        }, 3000); // Checa a cada 3 segundos
+    }
+</script>
+</body>
+</html>

@@ -1,0 +1,45 @@
+import os
+from groq import Groq
+from workers.core_ia.services_agents.prompts_agents import prompt_router
+import logging
+groq_service = Groq()
+logger = logging.getLogger(__name__)
+
+class Agent_router():
+    def __init__(self):
+        try:
+            self.client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+            self.prompt = prompt_router
+        except Exception as e:
+            raise EnvironmentError("A variável GROQ_API_KEY não está configurada.") from e
+    
+    def route_intent(self, message: str) -> str:
+        """
+        Gera uma resposta simples da IA para uma única mensagem do usuário, ou retorna a função a ser chamada.
+        
+        :param message: O histórico completo da conversa como uma string.
+        :return: A string de resposta (texto ou chamada de função).
+        """
+
+        mensagens = [
+            {
+                "role": "system",
+                "content": prompt_router,
+            },
+            {
+                "role": "user",
+                "content": message
+            }
+        ]
+        
+        try:
+            chat_completion = self.client.chat.completions.create(
+                messages=mensagens,
+                model="openai/gpt-oss-120b",
+                temperature=0.0 , 
+            )
+            return chat_completion.choices[0].message.content
+            
+        except Exception as e:
+            logger.error(f"Erro CRÍTICO no Agent_router (Groq): {e}", exc_info=True)
+            raise
