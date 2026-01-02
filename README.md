@@ -1,61 +1,69 @@
-# WhatsApp Session Manager: Arquitetura Híbrida de Microserviços
+# 🤖 WhatsApp Session Manager: Arquitetura Híbrida (Go + Python) & LLM Agents
 
-**Protótipo de Produção Ativa:** Otimizado para **Resiliência**, **Segurança** (HMAC/ID Check), **Observabilidade** e **Alta Concorrência**.
+> **Status de Produção:** 🚀 Deploy Ativo | **Stack:** Go, Python, Redis, PostgreSQL, Nginx, Docker.
 
-Este sistema gerencia sessões e interações de WhatsApp (via WAHA) através de uma arquitetura híbrida de microserviços (Go + Python/Django). O foco principal é a **Garantia de Entrega** e a execução confiável de **LLM Agents (Tool Calling)** para tarefas de negócio, priorizando a **baixa latência**.
+Este projeto é um sistema de orquestração de mensagens para WhatsApp (via WAHA) que utiliza uma **Arquitetura Híbrida de Microserviços**. O objetivo é garantir alta concorrência na borda (Edge) e inteligência contextual profunda no processamento (Core).
 
----
-
-## Arquitetura e Ganhos de Engenharia
-
-O projeto utiliza um **pipeline de processamento assíncrono (Go Way)** para desacoplar a ingestão da lógica de negócios, garantindo latência quase zero na borda.
-
-| Pilar | Funcionalidade | Detalhes Técnicos e Ganhos de Performance |
-| :--- | :--- | :--- |
-| **Ingestão/Borda** | **Go Webhook Gateway** | Serviço em **Golang** (I/O Bound). Aplica **Validação HMAC Criptograficamente Segura** para máxima concorrência. |
-| **Segurança/Integridade** | **Blindagem de Mensagem** | Worker Python utiliza **Redis SETNX** (TTL 60s) para **prevenir o processamento duplicado** de webhooks (`message_id` check). |
-| **Resiliência de Rede** | **Reverse Proxy Robusto (NGINX)** | Implementa **Rate Limiting** (burst/nodelay) e utiliza **Resolução Dinâmica de DNS** (`resolve` a cada 5s). |
-| **Comunicação/Fila** | **Mensageria Persistente** | Uso do **Redis List/LPUSH** para fila persistente, garantindo a **não-perda de mensagens** (Garantia de Entrega). |
-| **Lógica/IA** | **LLM Agents (Tool Calling)** | Implementação de Agentes LLM usando **Short-Circuiting** para **retorno direto de ações finalizadas**, minimizando o consumo de tokens e a latência. |
-| **Lógica/Segurança** | **Gestão de Sessão (LGPD)** | Gerencia o estado de sessão para **forçar o fluxo de consentimento LGPD** e controlar o diálogo de agendamento. |
-| **Qualidade** | **Observabilidade (Ready)** | Infraestrutura pronta com **Prometheus** e **Grafana** para coletar métricas do Go Gateway e Worker Python. |
+A solução implementa **LLM Agents** com **Tool Calling** para realizar agendamentos, cadastros e cancelamentos em tempo real, integrados ao Google Calendar.
 
 ---
 
-## Fluxo e Stack Tecnológica
+## 🏗️ Arquitetura de Engenharia
 
-### Fluxo de Mensagens (Assíncrono)
-A arquitetura assíncrona permite o **escalamento horizontal imediato** dos Workers Python, otimizando o *throughput* de processamento.
+O sistema foi desenhado para resolver o problema de latência e concorrência em chatbots de alta demanda.
 
-**WhatsApp Webhook** → **NGINX** (Rate Limit) → **Go Webhook Gateway** (HMAC/LPUSH) → **Redis Queue** → **Worker Python** (BLPOP/LLM Agents) → **WAHA API**
-
-### Stack Tecnológica
-
-| Camada | Tecnologia | Função Principal |
+| Camada | Tecnologia | Função Técnica |
 | :--- | :--- | :--- |
-| **Gateway/Ingestão** | **Go (Golang)** | Performance I/O, Validação HMAC. |
-| **Proxy/Borda** | **NGINX** | Rate Limiting, Segurança, Roteamento. |
-| **Lógica/Negócios** | **Django 4.2+ (Python)** | Gerenciamento de Estado, LLM Agents. |
-| **Mensageria/Fila** | **Redis** | Fila de Trabalho (LPUSH/BLPOP) e Gestão de Estado. |
-| **APIs/IA** | **WAHA API, Groq** | Comunicação com WhatsApp, Motor de Inferência LLM. |
+| **Edge Gateway** | **Go (Golang)** | Recebe Webhooks, valida HMAC (Segurança) e enfileira no Redis (LPUSH). Garante **latência < 10ms** na resposta ao provedor. |
+| **Message Broker** | **Redis** | Atua como Buffer de Mensagens e gerenciador de Estado (Sessão do Usuário, Contexto e Cache). |
+| **Core Workers** | **Python (Celery)** | Consome filas (BLPOP), gerencia a lógica de IA e executa Tool Calling. |
+| **Reverse Proxy** | **Nginx** | Gerencia SSL, Rate Limiting e roteamento de tráfego entre os containers Docker. |
+| **Persistência** | **PostgreSQL** | Armazenamento relacional de usuários, agendamentos e logs de auditoria. |
 
 ---
 
-## Roadmap de Agentes e Próximos Passos
+## 🧠 O "Cérebro": Orquestração de Agentes
 
-O projeto está com todos os Agentes LLM em produção, focando agora na instrumentação de métricas.
+O sistema utiliza uma estratégia de **Model Tiering** (Hierarquia de Modelos) para otimizar custo e latência, utilizando a Groq Cloud.
 
-### 1. Agentes LLM (Em Produção)
+### Fluxo de Decisão:
+1.  **Bot Detector (`Agent_bot_detector`)**:
+    * **Modelo:** `gpt-oss-20b` (Leve/Rápido).
+    * **Função:** Classificador binário. Detecta se a mensagem é SPAM ou outro Bot para *Early Exit* (economizando tokens).
+2.  **Router (`Agent_router`)**:
+    * **Modelo:** `gpt-oss-120b` (Robusto).
+    * **Função:** Analisa a intenção complexa do usuário e encaminha para o especialista correto.
+3.  **Especialistas (Specialists)**:
+    * **Agent_date:** Gerencia verificação de slots e conflitos de agenda.
+    * **Agent_register:** Valida dados e realiza cadastro (LGPD).
+    * **Agent_cancel:** Consulta agendamentos e executa cancelamento via Tool.
+    * **Agent_info:** RAG simples para informações institucionais.
 
-| Agente | Status | Descrição |
-| :--- | :--- | :--- |
-| **Agente de Registro** | ✅ Funcional | Gerencia o fluxo de consentimento LGPD e registra o nome do usuário. |
-| **Agente Roteador** | ✅ Otimizado | Detecta a intenção e direciona. **Foi refatorado para ser puramente um roteador** (Go-way: responsabilidade única). |
-| **Agente de Agendamento/Verificação** | ✅ Funcional | Gerencia a verificação de horários e a marcação de consultas. Otimizado com **Short-Circuiting** para saída rápida. |
-| **Agente de Informação** | ✅ Funcional | Agente dedicado a fornecer informações institucionais (endereço, horário, valores), reduzindo o escopo do Roteador. |
-| **Agente de Consulta/Cancelamento** | ✅ Funcional | Consultará consultas existentes e executará o cancelamento. **Implementa Short-Circuiting** para retorno direto da ação final. |
+---
 
-### 2. Observabilidade (Próxima Fase)
+## ⚙️ DevOps e Automação
 
-* **Instrumentação Fina:** Adicionar métricas (tempo de execução do LLM, latência do Worker) no Go Gateway e Worker Python usando *Prometheus Clients*.
-* **Visualização:** Criação de dashboards no Grafana para monitorar o SLA e diagnosticar gargalos de performance.
+O projeto segue práticas modernas de **Containerização e CI/CD**:
+
+* **Entrypoint Inteligente (`entrypoint.sh`)**: O container Web verifica a saúde do Banco de Dados, roda migrações (`migrate`), coleta estáticos e configura o WAHA automaticamente no boot.
+* **Self-Healing**: Containers configurados com `restart: unless-stopped` e Healthchecks nativos no Docker Compose.
+* **Rotinas de Manutenção (`Celery Beat`)**:
+    * 🕒 **Cleanup Service (03:00 AM):** Limpa slots de horários expirados no banco para manter a integridade das consultas.
+    * 🔔 **Lembretes Automáticos:** Worker dedicado que verifica a agenda e envia lembretes proativos via WhatsApp.
+
+---
+
+## 🚀 Como Rodar (Setup de Produção)
+
+### 1. Pré-requisitos
+* Docker & Docker Compose instalados.
+* Conta na Groq (API Key) e Google Cloud (Credentials).
+
+### 2. Configuração
+Clone o repositório e configure as variáveis de ambiente:
+
+```bash
+git clone [https://github.com/MaiconP-Y/chatbot_versionamento.git](https://github.com/MaiconP-Y/chatbot_versionamento.git)
+cd chatbot_versionamento
+cp .env.example .env
+# Edite o .env com suas chaves
