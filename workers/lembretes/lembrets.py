@@ -72,7 +72,7 @@ def process_reminders():
         dt_local = datetime.fromisoformat(start_iso.replace('Z', '+00:00')).astimezone(BR_TIMEZONE)
         msg = f"Olá {data['nome']}, passando para lembrar da sua consulta hoje às *{dt_local.strftime('%H:%M')}*."
         Waha().send_whatsapp_message(cliente_id, msg)
-        registrar_evento(cliente_id, event.get("id"), 'lembrete', 'success', "Único enviado")
+        registrar_evento(cliente_id, event.get("id"), 'lembrete', 'success', "Lembrete enviado")
         logger.info(f"✅ Sucesso: Lembrete único enviado para {data['nome']}.")
 
     except Exception as e:

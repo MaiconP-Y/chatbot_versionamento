@@ -282,73 +282,85 @@
     </div>
 
     <div id="aba-cadastros" class="tab-content">
-        <div class="row-layout">
-            <div class="section col-half">
-                <h2><i class="fas fa-address-book"></i> Usuários</h2>
-                <form id="form-remover-usuarios">
-                    <div class="table-container" style="max-height: 500px; overflow-y: auto;">
-                        {% if usuarios %}
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th style="width: 30px; text-align: center;"><input type="checkbox" onclick="toggleSelectAll('usuarios_selecionados', this)"></th>
-                                    <th>Nome / WhatsApp</th>
-                                    <th style="width: 80px;">Agenda 1</th>
-                                    <th style="width: 80px;">Agenda 2</th>
-                                    <th style="width: 90px; text-align: center;">Ações</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for usuario in usuarios %}
-                                <tr>
-                                    <td style="text-align: center;"><input type="checkbox" name="usuarios_selecionados" value="{{ usuario.chat_id }}"></td>
-                                    <td><strong>{{ usuario.username }}</strong><br><small>{{ usuario.whatsapp_display }}</small></td>
-                                    <td>{% if usuario.appointment1_datetime %}{{ usuario.appointment1_datetime|date:"d/m H:i" }}{% else %}-{% endif %}</td>
-                                    <td>{% if usuario.appointment2_datetime %}{{ usuario.appointment2_datetime|date:"d/m H:i" }}{% else %}-{% endif %}</td>
-                                    <td style="text-align: center;">
-                                        <button type="button" class="btn-action btn-small btn-warning" onclick="assumirConversa('{{ usuario.chat_id }}')">
-                                            <i class="fas fa-hand-paper"></i> Assumir
-                                        </button>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                        {% else %}
-                        <p style="padding: 20px;">Nenhum usuário no banco.</p>
-                        {% endif %}
-                    </div>
-                    <div style="margin-top: 15px; display: flex; justify-content: flex-end;">
-                        <button type="button" class="btn-action" style="background-color: var(--danger-color);" onclick="removerUsuariosBulk()">
-                            <i class="fas fa-trash-alt"></i> Excluir
-                        </button>
-                    </div>
-                </form>
-            </div>
-
-            <div class="section col-half">
-                <h2><i class="fas fa-chart-bar"></i> Atividade (Hoje)</h2>
+        <div style="display: flex; flex-direction: column; gap: 40px; width: 100%;">
+        
+        <div class="section" style="width: 100%;">
+            <h2><i class="fas fa-address-book"></i> Usuários & Agendamentos</h2>
+            <form id="form-remover-usuarios">
                 <div class="table-container" style="max-height: 500px; overflow-y: auto;">
-                    {% if logs_diarios %}
-                    <table style="width: 100%; table-layout: fixed;"> <thead>
+                    {% if usuarios %}
+                    <table>
+                        <thead>
                             <tr>
-                                <th style="width: 80px;">Hora</th>
-                                <th style="width: 45%;">WhatsApp</th> <th style="width: 45%;">Detalhes</th> </tr>
+                                <th style="width: 30px; text-align: center;"><input type="checkbox" onclick="toggleSelectAll('usuarios_selecionados', this)"></th>
+                                <th>Nome / WhatsApp</th>
+                                <th style="width: 90px;">Agenda 1</th>
+                                <th style="width: 90px;">Agenda 2</th>
+                                <th style="width: 90px;">Agenda 3</th>
+                                <th style="width: 90px;">Agenda 4</th>
+                                <th style="width: 100px; text-align: center;">Ações</th>
+                            </tr>
                         </thead>
                         <tbody>
-                            {% for log in logs_diarios %}
+                            {% for usuario in usuarios %}
                             <tr>
-                                <td>{{ log.time }}</td>
-                                <td>{{ log.phone }}</td>
-                                <td>{{ log.detalhes }}</td>
+                                <td style="text-align: center;"><input type="checkbox" name="usuarios_selecionados" value="{{ usuario.chat_id }}"></td>
+                                <td>
+                                    <strong>{{ usuario.username }}</strong> 
+                                    <span style="color: var(--text-secondary); opacity: 0.8; margin-left: 5px;">
+                                        / {{ usuario.chat_id|slice:":-5" }}
+                                    </span>
+                                </td>
+                                <td>{% if usuario.appointment1_datetime %}{{ usuario.appointment1_datetime|date:"d/m H:i" }}{% else %}-{% endif %}</td>
+                                <td>{% if usuario.appointment2_datetime %}{{ usuario.appointment2_datetime|date:"d/m H:i" }}{% else %}-{% endif %}</td>
+                                <td>{% if usuario.appointment3_datetime %}{{ usuario.appointment3_datetime|date:"d/m H:i" }}{% else %}-{% endif %}</td>
+                                <td>{% if usuario.appointment4_datetime %}{{ usuario.appointment4_datetime|date:"d/m H:i" }}{% else %}-{% endif %}</td>
+                                <td style="text-align: center;">
+                                    <button type="button" class="btn-action btn-small btn-warning" onclick="assumirConversa('{{ usuario.chat_id }}')">
+                                        <i class="fas fa-hand-paper"></i> Assumir
+                                    </button>
+                                </td>
                             </tr>
                             {% endfor %}
                         </tbody>
                     </table>
                     {% else %}
-                    <p style="text-align: center; color: var(--text-secondary); padding: 20px;">Sem atividade recente.</p>
+                    <p style="padding: 20px;">Nenhum usuário no banco.</p>
                     {% endif %}
                 </div>
+                <div style="margin-top: 15px; display: flex; justify-content: flex-end;">
+                    <button type="button" class="btn-action" style="background-color: var(--danger-color);" onclick="removerUsuariosBulk()">
+                        <i class="fas fa-trash-alt"></i> Excluir Selecionados
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <div class="section" style="width: 100%;">
+            <h2><i class="fas fa-chart-bar"></i> Logs de Atividade Recente (Hoje)</h2>
+            <div class="table-container" style="max-height: 400px; overflow-y: auto;">
+                {% if logs_diarios %}
+                <table style="width: 100%;"> 
+                    <thead>
+                        <tr>
+                            <th style="width: 120px;">Horário</th>
+                            <th style="width: 250px;">WhatsApp</th> 
+                            <th>Detalhes da Interação</th> 
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for log in logs_diarios %}
+                        <tr>
+                            <td>{{ log.time }}</td>
+                            <td>{{ log.phone }}</td>
+                            <td style="white-space: normal; word-wrap: break-word;">{{ log.detalhes }}</td> 
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p style="text-align: center; color: var(--text-secondary); padding: 20px;">Sem atividade registrada hoje.</p>
+                {% endif %}
             </div>
         </div>
     </div>

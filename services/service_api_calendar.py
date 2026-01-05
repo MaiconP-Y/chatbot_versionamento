@@ -100,56 +100,58 @@ def is_slot_busy(slot_time_str: str, busy_blocks: list, data: str, duration_minu
 
 def buscar_disponibilidade_escalonada(
     service, 
-    limite_slots: int = 3, 
+    limite_slots: int = 11, # Alterado para 11 como meta padrão
     duracao_minutos: int = 60,
-    margens_dias: list[int] = None
+    margens_dias: list[int] = None # Mantido na assinatura para não quebrar chamadas externas
 ) -> dict:
     """
-    Busca os próximos slots livres usando a estratégia escalonada.
+    Busca os próximos slots livres de forma contínua até atingir o limite_slots.
+    Não impõe limite fixo de 30 dias, mas possui trava de segurança de 90 dias.
     """
-    if margens_dias is None:
-        margens_dias = [4, 10, 30] 
-        
     hoje = datetime.now(BR_TIMEZONE).date()
     slots_sugeridos = []
     
-    for margem in margens_dias:
-        logging.info(f"Iniciando busca flexível: Margem de +{margem} dias (sem domingos).")
-        for i in range(margem):
-            data_atual = hoje + timedelta(days=i)
-            if data_atual.weekday() == 6: 
-                logging.debug(f"⏭️ Pulando {data_atual.strftime('%Y-%m-%d')} - É Domingo.")
-                continue       
-            
-            data_str = data_atual.strftime("%Y-%m-%d")
-            resultado = ServicesCalendar.buscar_horarios_disponiveis(
-                data_str, 
-                None,     
-                duracao_minutos,
-                service=service 
-            )
-            
-            if resultado.get('status') != 'SUCCESS':
-                continue
-            
-            for hora in resultado.get('available_slots', []):
-                data_hora_iso = f"{data_str}T{hora}:00-03:00"
-                try:
-                    data_hr_obj = datetime.strptime(f"{data_str} {hora}", "%Y-%m-%d %H:%M")
-                    data_hr_legivel = data_hr_obj.strftime("%d/%m - %H:%M")
-                except ValueError:
-                    continue
+    dias_tentados = 0
+    MAX_DIAS_LIMITE = 90
 
-                slots_sugeridos.append({
-                    'iso_time': data_hora_iso,
-                    'legivel': data_hr_legivel
-                })
-                
-                if len(slots_sugeridos) >= limite_slots:
-                    return {
-                        "status": "SUCCESS", 
-                        "available_slots": slots_sugeridos
-                    }
+    while len(slots_sugeridos) < limite_slots and dias_tentados < MAX_DIAS_LIMITE:
+        data_atual = hoje + timedelta(days=dias_tentados)
+        dias_tentados += 1
+
+        if data_atual.weekday() == 6: 
+            logging.debug(f"⏭️ Pulando {data_atual.strftime('%Y-%m-%d')} - É Domingo.")
+            continue       
+        
+        data_str = data_atual.strftime("%Y-%m-%d")
+
+        resultado = ServicesCalendar.buscar_horarios_disponiveis(
+            data_str, 
+            None,     
+            duracao_minutos,
+            service=service 
+        )
+        
+        if resultado.get('status') != 'SUCCESS':
+            continue
+
+        for hora in resultado.get('available_slots', []):
+            data_hora_iso = f"{data_str}T{hora}:00-03:00"
+            try:
+                data_hr_obj = datetime.strptime(f"{data_str} {hora}", "%Y-%m-%d %H:%M")
+                data_hr_legivel = data_hr_obj.strftime("%d/%m - %H:%M")
+            except ValueError:
+                continue
+
+            slots_sugeridos.append({
+                'iso_time': data_hora_iso,
+                'legivel': data_hr_legivel
+            })
+
+            if len(slots_sugeridos) >= limite_slots:
+                return {
+                    "status": "SUCCESS", 
+                    "available_slots": slots_sugeridos
+                }
 
     if slots_sugeridos:
         return {"status": "SUCCESS", "available_slots": slots_sugeridos}
@@ -157,7 +159,7 @@ def buscar_disponibilidade_escalonada(
     return {
         "status": "SUCCESS",
         "available_slots": [],
-        "message": "Nenhum horário disponível foi encontrado nas próximas semanas."
+        "message": "Nenhum horário disponível foi encontrado no período de busca."
     }
 
 class ServicesCalendar:

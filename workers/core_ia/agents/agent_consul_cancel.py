@@ -49,7 +49,7 @@ class Agent_cancel:
             chat_completion = self.client.chat.completions.create(
                 messages=mensagens,
                 model="openai/gpt-oss-120b",
-                temperature=0.1,
+                temperature=0.0,
                 tools=TOOLS_CANCEL,
                 tool_choice="auto"
             )

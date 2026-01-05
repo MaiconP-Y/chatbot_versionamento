@@ -21,6 +21,12 @@ class UserRegister(models.Model):
     appointment2_datetime = models.DateTimeField(null=True, blank=True, verbose_name="Data/Hora 2ª Consulta")
     appointment2_gcal_id = models.CharField(max_length=255, null=True, blank=True, unique=True, verbose_name="ID Google Calendar 2")
 
+    appointment3_datetime = models.DateTimeField(null=True, blank=True, verbose_name="Data/Hora 3ª Consulta")
+    appointment3_gcal_id = models.CharField(max_length=255, null=True, blank=True, unique=True, verbose_name="ID Google Calendar 3")
+
+    appointment4_datetime = models.DateTimeField(null=True, blank=True, verbose_name="Data/Hora 4ª Consulta")
+    appointment4_gcal_id = models.CharField(max_length=255, null=True, blank=True, unique=True, verbose_name="ID Google Calendar 4")
+
     def __str__(self):
         return self.chat_id
     

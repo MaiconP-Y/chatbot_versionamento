@@ -8,6 +8,9 @@ from workers.core_ia.agents.agent_info import Agent_info
 from workers.core_ia.utils.user_data_service import get_user_name_from_db
 from workers.core_ia.agents.agent_bot_detector import Agent_bot_detector, TAG_BOT, TAG_HUMAN
 
+from services.waha_api import Waha
+waha_service = Waha()
+
 import logging 
 from services.redis_client import update_session_state
 
@@ -57,13 +60,11 @@ class agent_service():
                 else: 
                     response = self.router_agent.route_intent(history_str)
                     if response == 'ativar_agent_atendimento_humano':
-                        # Centralizar o handover humano: blacklist + limpar estado + sinalizar reroute
-                        add_to_blacklist(chat_id)
+                        waha_service.send_doctor_contact(chat_id)
                         delete_history(chat_id)
                         delete_session_state(chat_id)
                         delete_user_profile_cache(chat_id)
-                        final_message = ("Ok, solicitação detectada com sucesso. Um de nossos agentes entrará em contato com você em breve. "
-                                         "A partir de agora, nosso bot não processará mais suas mensagens.")
+                        final_message = ("Ok, solicitação detectada com sucesso. Só mandar mensagem ao contato enviado e logo o Doutor atendera.")
                         from core_ia.services_agents.tool_reset import REROUTE_COMPLETED_STATUS
                         return f"{REROUTE_COMPLETED_STATUS}|{final_message}"
                     if response == 'ativar_agent_marc':
@@ -96,19 +97,13 @@ class agent_service():
             
         except Exception as e:
             logger.error(f"Erro CRÍTICO no serviço de IA para chat_id {chat_id}: {e}", exc_info=True)
-            
-            # 1. Tenta limpar a memória para evitar travamento eterno
+                  
             try:
                 delete_history(chat_id)
                 delete_session_state(chat_id)
             except:
                 pass
 
-            # 2. Inicializa o serviço WAHA (caso não esteja injetado)
-            from services.waha_api import Waha
-            waha_service = Waha()
-
-            # 3. MENSAGEM DE TEXTO AMIGÁVEL
             msg_erro_cliente = (
                 "😓 *Ops! Tive um problema técnico inesperado.*\n\n"
                 "Para garantir que você seja atendido, estou enviando abaixo o contato "
@@ -116,10 +111,6 @@ class agent_service():
                 "Por favor, encaminhe o erro ou chame no contato abaixo:"
             )
             waha_service.send_whatsapp_message(chat_id, msg_erro_cliente)
-
-            # 4. ENVIA O SEU CARD DE CONTATO (A função que você já tem)
-            # Isso fará aparecer o botão "Adicionar Contato" ou "Conversar" para o cliente
             waha_service.send_support_contact(chat_id)
 
-            # 5. IMPORTANTE: Re-lança o erro para o Worker pegar e TE avisar
             raise e

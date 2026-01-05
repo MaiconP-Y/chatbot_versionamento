@@ -123,6 +123,29 @@ def get_user_data(request, chat_id):
                 "datetime_iso": user.appointment2_datetime.isoformat()
             })
 
+        if user.appointment3_gcal_id and user.appointment3_datetime and user.appointment3_datetime >= agora:
+            local_dt3 = timezone.localtime(user.appointment3_datetime)
+            consultas.append({
+                "appointment_number": 3,
+                "data": local_dt3.strftime("%d/%m/%Y"),
+                "hora": local_dt3.strftime("%H:%M"),
+                "slot": 3,
+                "gcal_id": user.appointment3_gcal_id,
+                "datetime_iso": user.appointment3_datetime.isoformat()
+            })
+
+        # Slot 4
+        if user.appointment4_gcal_id and user.appointment4_datetime and user.appointment4_datetime >= agora:
+            local_dt4 = timezone.localtime(user.appointment4_datetime)
+            consultas.append({
+                "appointment_number": 4,
+                "data": local_dt4.strftime("%d/%m/%Y"),
+                "hora": local_dt4.strftime("%H:%M"),
+                "slot": 4,
+                "gcal_id": user.appointment4_gcal_id,
+                "datetime_iso": user.appointment4_datetime.isoformat()
+            })
+
         consultas.sort(key=lambda x: datetime.strptime(f"{x['data']} {x['hora']}", "%d/%m/%Y %H:%M"))
         
         response_data = {
@@ -164,7 +187,6 @@ def salvar_agendamento_transacional(request):
         agora = timezone.now()
         
         is_slot1_free = not user.appointment1_gcal_id or (user.appointment1_datetime and user.appointment1_datetime < agora)
-        
         if is_slot1_free:
             user.appointment1_datetime = new_datetime
             user.appointment1_gcal_id = google_event_id
@@ -174,7 +196,6 @@ def salvar_agendamento_transacional(request):
             return Response(response_data, status=status.HTTP_200_OK)
 
         is_slot2_free = not user.appointment2_gcal_id or (user.appointment2_datetime and user.appointment2_datetime < agora)
-        
         if is_slot2_free:
             user.appointment2_datetime = new_datetime
             user.appointment2_gcal_id = google_event_id
@@ -182,8 +203,28 @@ def salvar_agendamento_transacional(request):
             logger.info(f"✅ Agendamento salvo no slot 2 (BaaS) - Cliente: {chat_id}")
             response_data = {"status": "SUCCESS", "slot": 2, "data": new_datetime.strftime('%d/%m/%Y às %H:%M')}
             return Response(response_data, status=status.HTTP_200_OK)
+
+        is_slot3_free = not user.appointment3_gcal_id or (user.appointment3_datetime and user.appointment3_datetime < agora)
+        if is_slot3_free:
+            user.appointment3_datetime = new_datetime
+            user.appointment3_gcal_id = google_event_id
+            user.save(update_fields=['appointment3_datetime', 'appointment3_gcal_id']) 
+            logger.info(f"✅ Agendamento salvo no slot 3 (BaaS) - Cliente: {chat_id}")
+            response_data = {"status": "SUCCESS", "slot": 3, "data": new_datetime.strftime('%d/%m/%Y às %H:%M')}
+            return Response(response_data, status=status.HTTP_200_OK)
+
+        is_slot4_free = not user.appointment4_gcal_id or (user.appointment4_datetime and user.appointment4_datetime < agora)
+        if is_slot4_free:
+            user.appointment4_datetime = new_datetime
+            user.appointment4_gcal_id = google_event_id
+            user.save(update_fields=['appointment4_datetime', 'appointment4_gcal_id']) 
+            logger.info(f"✅ Agendamento salvo no slot 4 (BaaS) - Cliente: {chat_id}")
+            response_data = {"status": "SUCCESS", "slot": 4, "data": new_datetime.strftime('%d/%m/%Y às %H:%M')}
+            return Response(response_data, status=status.HTTP_200_OK)
+
         else:
-            return Response({"status": "FAILURE", "message": "Limite de agendamentos atingido. Você pode ter no máximo 2 consultas ativas."}, 
+            # Atualize a mensagem de erro
+            return Response({"status": "FAILURE", "message": "Limite de agendamentos atingido. Você pode ter no máximo 4 consultas ativas."}, 
                             status=status.HTTP_409_CONFLICT)
                             
     except UserRegister.DoesNotExist:
@@ -265,6 +306,18 @@ def cancel_appointment_transacional(request):
                 user.appointment2_gcal_id = None
                 user.save(update_fields=['appointment2_datetime', 'appointment2_gcal_id'])
                 db_slot_cleared = True
+
+            elif numero_consulta == 3 and user.appointment3_gcal_id:
+                user.appointment3_datetime = None
+                user.appointment3_gcal_id = None
+                user.save(update_fields=['appointment3_datetime', 'appointment3_gcal_id'])
+                db_slot_cleared = True
+
+            elif numero_consulta == 4 and user.appointment4_gcal_id:
+                user.appointment4_datetime = None
+                user.appointment4_gcal_id = None
+                user.save(update_fields=['appointment4_datetime', 'appointment4_gcal_id'])
+                db_slot_cleared = True
                 
             if not db_slot_cleared:
                 return Response({"status": "FAILURE", "message": f"Não encontrei agendamento ativo no slot {numero_consulta} para limpar."}, 
@@ -312,6 +365,24 @@ def list_active_appointments(request, chat_id):
                 "datetime_iso": user.appointment2_datetime.isoformat()
             })
 
+        if user.appointment3_datetime and user.appointment3_datetime > agora:
+            lista_consultas.append({
+                "appointment_number": 3, 
+                "data": user.appointment3_datetime.strftime('%d/%m/%Y'),
+                "hora": user.appointment3_datetime.strftime('%H:%M'),
+                "gcal_id": user.appointment3_gcal_id,
+                "datetime_iso": user.appointment3_datetime.isoformat()
+            })
+
+        if user.appointment4_datetime and user.appointment4_datetime > agora:
+            lista_consultas.append({
+                "appointment_number": 4, 
+                "data": user.appointment4_datetime.strftime('%d/%m/%Y'),
+                "hora": user.appointment4_datetime.strftime('%H:%M'),
+                "gcal_id": user.appointment4_gcal_id,
+                "datetime_iso": user.appointment4_datetime.isoformat()
+            })
+
         return Response({"status": "SUCCESS", "appointments": lista_consultas}, status=status.HTTP_200_OK)
         
     except UserRegister.DoesNotExist:
@@ -349,7 +420,23 @@ def cleanup_expired_appointments_view(request):
         appointment2_gcal_id=None
     )
 
-    total_limpos = result_slot1 + result_slot2
+    result_slot3 = UserRegister.objects.filter(
+        appointment3_datetime__lt=data_limite,
+        appointment3_datetime__isnull=False 
+    ).update(
+        appointment3_datetime=None,
+        appointment3_gcal_id=None
+    )
+
+    result_slot4 = UserRegister.objects.filter(
+        appointment4_datetime__lt=data_limite,
+        appointment4_datetime__isnull=False
+    ).update(
+        appointment4_datetime=None,
+        appointment4_gcal_id=None
+    )
+
+    total_limpos = result_slot1 + result_slot2 + result_slot3 + result_slot4
     
     if total_limpos > 0:
         logger.info(f"✅ Limpeza concluída. {total_limpos} slots antigos foram liberados.")

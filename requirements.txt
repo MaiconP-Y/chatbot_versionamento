@@ -2,7 +2,7 @@
 Django==5.2.7       # Framework Web
          # Manter a versão do Framework Principal
 groq            
-psycopg2
+psycopg2-binary
 redis           
 
 # --- Servidor Web (ASGI/WSGI) ---

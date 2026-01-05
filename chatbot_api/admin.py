@@ -19,7 +19,9 @@ class UserRegisterAdmin(admin.ModelAdmin):
         'chat_id', 
         'username', 
         'appointment1_datetime', 
-        'appointment2_datetime'
+        'appointment2_datetime',
+        'appointment3_datetime',
+        'appointment4_datetime'
     )
     search_fields = ('chat_id', 'username')
     list_display_links = ('chat_id', 'username')
