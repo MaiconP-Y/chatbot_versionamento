@@ -75,7 +75,7 @@ CALENDÁRIO DE REFERÊNCIA PARA HOJE/AMANHÃ:
             if response_message.tool_calls:
                 available_functions = {
                     "agendar_consulta_1h": ServicesCalendar.criar_evento,
-                    "ver_horarios_disponiveis": ServicesCalendar.buscar_horarios_disponiveis,
+                    "ver_horarios_disponiveis": ServicesCalendar.buscar_eventos_do_dia,
                     "finalizar_user": finalizar_user, 
                     "exibir_proximos_horarios_flex": ServicesCalendar.exibir_proximos_horarios_flex, 
                 }
@@ -199,19 +199,18 @@ Fique tranquilo(a), enviaremos um lembrete 2 horas antes no dia agendado."""
                     elif function_name == "ver_horarios_disponiveis":
                         data_YYYY_MM_DD = function_args.get("data") 
 
+                        # Validações de Negócio usando a data bruta
                         try:
                             dt_obj = datetime.strptime(data_YYYY_MM_DD, "%Y-%m-%d")
                             data_para_validacao = dt_obj.strftime("%d/%m/%Y")
                         except ValueError:
-                            data_para_validacao = data_YYYY_MM_DD 
+                            return "Data inválida. Use AAAA-MM-DD."
 
-                        validacao_passada = validar_data_nao_passada(data_para_validacao)
-                        if not validacao_passada.get('status') == 'SUCCESS': 
-                            return "A data que você informou já passou. Por favor, escolha uma data futura."
+                        v_passada = validar_data_nao_passada(data_para_validacao)
+                        if v_passada.get('status') != 'SUCCESS': return v_passada.get('message')
 
-                        validacao_domingo = validar_dia_nao_domingo(data_para_validacao)
-                        if not validacao_domingo.get('status') == 'SUCCESS':
-                            return "Não agendamos consultas aos domingos. Por favor, escolha outro dia."
+                        v_domingo = validar_dia_nao_domingo(data_para_validacao)
+                        if v_domingo.get('status') != 'SUCCESS': return v_domingo.get('message')
                         
                         function_args['service'] = ServicesCalendar.get_service()
                         resultado_tool = ServicesCalendar.buscar_horarios_disponiveis(**function_args)
@@ -219,17 +218,18 @@ Fique tranquilo(a), enviaremos um lembrete 2 horas antes no dia agendado."""
                         if resultado_tool.get("status") == "ERROR":
                             return resultado_tool.get('message')
 
-                        available_slots = resultado_tool.get("available_slots", [])
-                        data_formatada = data_para_validacao
+                        # Uso do dia formatado (Ex: Quarta-feira 14/01) vindo do backend
+                        dia_exibicao = resultado_tool.get("dia_formatado")
+                        slots = resultado_tool.get("available_slots", [])
                         
-                        if not available_slots:
-                            return (f"""{REROUTE_COMPLETED_STATUS}|Nenhum horário disponível em **{data_formatada}**.\n\nInforme outra data para verificar (AAAA-MM-DD).""")
-                        else:
-                            update_session_state(chat_id, registration_step=AGENT_DATE_CONFIRM) 
-                            slots_str = "\n".join([f"  - {slot}" for slot in available_slots])
-                            return (f"""Os Horários disponíveis em *{data_formatada}*:
+                        if not slots:
+                            return f"{REROUTE_COMPLETED_STATUS}|Nenhum horário disponível em **{dia_exibicao}**. Tente outra data."
+                        
+                        update_session_state(chat_id, registration_step=AGENT_DATE_CONFIRM) 
+                        slots_str = "\n".join([f"  - {slot}" for slot in slots])
+                        return (f"""Os horários disponíveis em *{dia_exibicao}* são:
 {slots_str}
-Qual horário deseja agendar? (Informe o horário no formato HH:MM)""")         
+Qual horário deseja agendar?""")  
 
                     elif function_name == 'exibir_proximos_horarios_flex':
                         resultado_str = function_to_call(

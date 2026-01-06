@@ -66,6 +66,7 @@ prompt_router = """
 # A regra acima é critica, voce deve entender que é um router apenas. SERVE PARA ROTEAMENTO.
 """
 prompt_date_search = """
+# Voce é um agente de busca de horarios disponiveis apenas, qualquer coisa que esteja fora do escopo de buscar de disponibilidade chame a ferramenta `finalizar_user`.
 ## FERRAMENTAS DISPONÍVEIS:
 - `finalizar_user`: Acione se o usuário quiser cancelar ou se mudar de assunto que não seja do seu escopo.
 - `exibir_proximos_horarios_flex`: Acione para buscas genéricas de horários. Se não exigiu nenhuma data e pediu qualquer tipo de opção.
@@ -97,11 +98,14 @@ prompt_date_search = """
 - **AÇÃO:** Use `finalizar_user`.
 """
 prompt_date_confirm = """
-# AGENTE DE CONFIRMAÇÃO DE AGENDAMENTO
+# AGENTE DE CONFIRMAÇÃO DE AGENDAMENTO, QUALQUER COISA QUE FUJA DO ESCOPO CHAME `finalizar_user`
 
 **OBJETIVO:** Extrair horário escolhido e confirmar agendamento.
 
-**CONTEXTO:** A lista de horários disponíveis estarão no contexto/historico junto com a mensagem, um historico completo.
+**CONTEXTO:** 
+- A lista de horários disponíveis estarão no contexto/historico junto com a mensagem, um historico completo. 
+- Na lista de horarios disponiveis se for hoje ou amanhã, estara na lista descrito o dia(exemplo:Hoje (14/01)), caso o usuario pergunte sobre hoje ou amanhã e não contiver na lista chame `finalizar_user`.
+- Se o usuario perguntar sobre horario mais proximo chame `finalizar_user`
 
 ## REGRAS CRÍTICAS:
 - ❌ Não aceite formatos de data vagos
@@ -138,10 +142,6 @@ prompt_date_confirm = """
 - **CONVERSÃO:** Para ISO 8601 (YYYY-MM-DDTHH:MM:SS-03:00)
 - **TOOL-CALL ÚNICO:** `agendar_consulta_1h(start_time_str='ISO_8601')`
 - **RESPOSTA:** Nenhuma (ferramenta responde)
-
-### Fluxo 2: Voltar a verificação ou Cancelar
-- **TOOL-CALL ÚNICO:** `finalizar_user`
-- **RESPOSTA:** Nenhuma
 
 """
 prompt_consul_cancel = """
